@@ -6,25 +6,24 @@ from rubin_sim.scheduler.schedulers import Core_scheduler, simple_filter_sched
 from rubin_sim.scheduler.utils import (Sky_area_generator,
                                        make_rolling_footprints)
 import rubin_sim.scheduler.basis_functions as bf
-from rubin_sim.scheduler.surveys import (Greedy_survey, Blob_survey, Scripted_survey)
+from rubin_sim.scheduler.surveys import (Greedy_survey, Blob_survey, generate_dd_surveys)
 from rubin_sim.scheduler import sim_runner
 import rubin_sim.scheduler.detailers as detailers
 import sys
 import subprocess
 import os
-import argparse
-from make_ddf_survey import generate_ddf_scheduled_obs
-import rubin_sim
 # So things don't fail on hyak
 from astropy.utils import iers
 iers.conf.auto_download = False
+
+mjd_start = 59638
 
 
 def gen_greedy_surveys(nside=32, nexp=2, exptime=30., filters=['r', 'i', 'z', 'y'],
                        camera_rot_limits=[-80., 80.],
                        shadow_minutes=60., max_alt=76., moon_distance=30., ignore_obs='DD',
                        m5_weight=3., footprint_weight=0.75, slewtime_weight=3.,
-                       stayfilter_weight=3., repeat_weight=-1., footprints=None):
+                       stayfilter_weight=3., footprints=None):
     """
     Make a quick set of greedy surveys
 
@@ -80,8 +79,6 @@ def gen_greedy_surveys(nside=32, nexp=2, exptime=30., filters=['r', 'i', 'z', 'y
                                                 out_of_bounds_val=np.nan, nside=nside), footprint_weight))
         bfs.append((bf.Slewtime_basis_function(filtername=filtername, nside=nside), slewtime_weight))
         bfs.append((bf.Strict_filter_basis_function(filtername=filtername), stayfilter_weight))
-        bfs.append((bf.Visit_repeat_basis_function(gap_min=0, gap_max=18*60., filtername=None,
-                                                   nside=nside, npairs=20), repeat_weight))
         # Masks, give these 0 weight
         bfs.append((bf.Zenith_shadow_mask_basis_function(nside=nside, shadow_minutes=shadow_minutes,
                                                          max_alt=max_alt), 0))
@@ -107,7 +104,7 @@ def generate_blobs(nside, nexp=2, exptime=30., filter1s=['u', 'u', 'g', 'r', 'i'
                    m5_weight=6., footprint_weight=1.5, slewtime_weight=3.,
                    stayfilter_weight=3., template_weight=12., footprints=None, u_nexp1=True,
                    scheduled_respect=45., good_seeing={'g': 3, 'r': 3, 'i': 3}, good_seeing_weight=3.,
-                   mjd_start=1, repeat_weight=-1):
+                   mjd_start=1):
     """
     Generate surveys that take observations in blobs.
 
@@ -163,7 +160,7 @@ def generate_blobs(nside, nexp=2, exptime=30., filter1s=['u', 'u', 'g', 'r', 'i'
                           'read_approx': 2., 'min_pair_time': 15., 'search_radius': 30.,
                           'alt_max': 85., 'az_range': 90., 'flush_time': 30.,
                           'smoothing_kernel': None, 'nside': nside, 'seed': 42, 'dither': True,
-                          'twilight_scale': False}
+                          'twilight_scale': True}
 
     surveys = []
 
@@ -174,7 +171,6 @@ def generate_blobs(nside, nexp=2, exptime=30., filter1s=['u', 'u', 'g', 'r', 'i'
                                                            max_rot=np.max(camera_rot_limits)))
         detailer_list.append(detailers.Rottep2Rotsp_desired_detailer())
         detailer_list.append(detailers.Close_alt_detailer())
-        detailer_list.append(detailers.Flush_for_sched_detailer())
         # List to hold tuples of (basis_function_object, weight)
         bfs = []
 
@@ -199,8 +195,6 @@ def generate_blobs(nside, nexp=2, exptime=30., filter1s=['u', 'u', 'g', 'r', 'i'
 
         bfs.append((bf.Slewtime_basis_function(filtername=filtername, nside=nside), slewtime_weight))
         bfs.append((bf.Strict_filter_basis_function(filtername=filtername), stayfilter_weight))
-        bfs.append((bf.Visit_repeat_basis_function(gap_min=0, gap_max=18*60., filtername=None,
-                                                   nside=nside, npairs=20), repeat_weight))
 
         if filtername2 is not None:
             bfs.append((bf.N_obs_per_year_basis_function(filtername=filtername, nside=nside,
@@ -279,7 +273,7 @@ def generate_twi_blobs(nside, nexp=2, exptime=30., filter1s=['r', 'i', 'z', 'y']
                        shadow_minutes=60., max_alt=76., moon_distance=30., ignore_obs='DD',
                        m5_weight=6., footprint_weight=1.5, slewtime_weight=3.,
                        stayfilter_weight=3., template_weight=12., footprints=None, repeat_night_weight=None,
-                       wfd_footprint=None, scheduled_respect=15., repeat_weight=-1.):
+                       wfd_footprint=None, scheduled_respect=15.):
     """
     Generate surveys that take observations in blobs.
 
@@ -342,7 +336,6 @@ def generate_twi_blobs(nside, nexp=2, exptime=30., filter1s=['r', 'i', 'z', 'y']
                                                            max_rot=np.max(camera_rot_limits)))
         detailer_list.append(detailers.Rottep2Rotsp_desired_detailer())
         detailer_list.append(detailers.Close_alt_detailer())
-        detailer_list.append(detailers.Flush_for_sched_detailer())
         # List to hold tuples of (basis_function_object, weight)
         bfs = []
 
@@ -367,8 +360,6 @@ def generate_twi_blobs(nside, nexp=2, exptime=30., filter1s=['r', 'i', 'z', 'y']
 
         bfs.append((bf.Slewtime_basis_function(filtername=filtername, nside=nside), slewtime_weight))
         bfs.append((bf.Strict_filter_basis_function(filtername=filtername), stayfilter_weight))
-        bfs.append((bf.Visit_repeat_basis_function(gap_min=0, gap_max=18*60., filtername=None,
-                                                   nside=nside, npairs=20), repeat_weight))
 
         if filtername2 is not None:
             bfs.append((bf.N_obs_per_year_basis_function(filtername=filtername, nside=nside,
@@ -424,19 +415,13 @@ def generate_twi_blobs(nside, nexp=2, exptime=30., filter1s=['r', 'i', 'z', 'y']
     return surveys
 
 
-def ddf_surveys(detailers=None, season_frac=0.2):
-    obs_array = generate_ddf_scheduled_obs(season_frac=season_frac)
-    survey = Scripted_survey([], detailers=detailers)
-    survey.set_script(obs_array)
-    return [survey]
-
-
-def run_sched(scheduler, survey_length=365.25, nside=32, fileroot='baseline_', verbose=False,
+def run_sched(surveys, survey_length=365.25, nside=32, fileroot='baseline_', verbose=False,
               extra_info=None, illum_limit=40.):
     years = np.round(survey_length/365.25)
+    scheduler = Core_scheduler(surveys, nside=nside)
     n_visit_limit = None
     filter_sched = simple_filter_sched(illum_limit=illum_limit)
-    observatory = Model_observatory(nside=nside)
+    observatory = Model_observatory(nside=nside, mjd_start=mjd_start)
     observatory, scheduler, observations = sim_runner(observatory, scheduler,
                                                       survey_length=survey_length,
                                                       filename=fileroot+'%iyrs.db' % years,
@@ -466,12 +451,6 @@ def create_scheduler(survey_length=3652.5, maxDither=0.7, moon_illum_limit=40, n
         extra_info['git hash'] = 'Not in git repo'
 
     extra_info['file executed'] = os.path.realpath(__file__)
-    try:
-        rs_path = rubin_sim.__path__[0]
-        hash_file = os.path.join(rs_path, '../', '.git/refs/heads/main')
-        extra_info['rubin_sim git hash'] = subprocess.check_output(['cat', hash_file])
-    except subprocess.CalledProcessError:
-        pass
 
     sm = Sky_area_generator(nside=nside)
 
@@ -486,7 +465,7 @@ def create_scheduler(survey_length=3652.5, maxDither=0.7, moon_illum_limit=40, n
 
     repeat_night_weight = None
 
-    observatory = Model_observatory(nside=nside)
+    observatory = Model_observatory(nside=nside, mjd_start=mjd_start)
     conditions = observatory.return_conditions()
 
     footprints = make_rolling_footprints(fp_hp=footprints_hp, mjd_start=conditions.mjd_start,
@@ -499,8 +478,8 @@ def create_scheduler(survey_length=3652.5, maxDither=0.7, moon_illum_limit=40, n
     details = [detailers.Camera_rot_detailer(min_rot=-camera_ddf_rot_limit, max_rot=camera_ddf_rot_limit),
                dither_detailer, u_detailer, detailers.Rottep2Rotsp_desired_detailer()]
     euclid_detailers = [detailers.Camera_rot_detailer(min_rot=-camera_ddf_rot_limit, max_rot=camera_ddf_rot_limit),
-                        detailers.Euclid_dither_detailer(), u_detailer]
-    ddfs = ddf_surveys(detailers=details, season_frac=ddf_season_frac)
+                        detailers.Euclid_dither_detailer(), u_detailer, detailers.Rottep2Rotsp_desired_detailer()]
+    ddfs = generate_dd_surveys(nside=nside, nexp=nexp, detailers=details, euclid_detailers=euclid_detailers)
 
     greedy = gen_greedy_surveys(nside, nexp=nexp, footprints=footprints)
 
@@ -510,6 +489,7 @@ def create_scheduler(survey_length=3652.5, maxDither=0.7, moon_illum_limit=40, n
                                    wfd_footprint=wfd_footprint,
                                    repeat_night_weight=repeat_night_weight)
     surveys = [ddfs, blobs, twi_blobs, greedy]
+
     scheduler = Core_scheduler(surveys, nside=nside)
     return scheduler
 

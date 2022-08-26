@@ -6,3 +6,4 @@ Started with the survey from https://github.com/lsst-sims/sims_featureScheduler_
 
 Warning! Survey simulation results are not cross-platform repeatable. So all steps should be run on the same hardware.
 
+Converting to use the march_start simulation as the base for this.
