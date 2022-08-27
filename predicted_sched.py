@@ -14,6 +14,7 @@ from rubin_sim.site_models import Almanac
 # So things don't fail on hyak
 from astropy.utils import iers
 iers.conf.auto_download = False
+mjd_start = 59638
 
 
 # grabbing this from rubin_sim and making some mods
@@ -84,7 +85,6 @@ if __name__ == '__main__':
     truth_file = args.truth_file
     survey_length = args.survey_length
 
-    mjd_start = survey_start_mjd()
     almanac = Almanac(mjd_start)
 
     indx = np.where(almanac.sunsets['night'] == night_start)[0]
