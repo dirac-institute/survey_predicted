@@ -3,7 +3,7 @@ from rubin_sim.scheduler.schedulers import simple_filter_sched
 from rubin_sim.scheduler import sim_runner
 from rubin_sim.scheduler.modelObservatory import Model_observatory
 import numpy as np
-
+mjd_start = 59638
 
 if __name__ == '__main__':
     nside = 32
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     scheduler = create_scheduler()
     n_visit_limit = None
     filter_sched = simple_filter_sched(illum_limit=illum_limit)
-    observatory = Model_observatory(nside=nside)
+    observatory = Model_observatory(nside=nside, mjd_start=mjd_start)
     observatory, scheduler, observations = sim_runner(observatory, scheduler,
                                                       survey_length=survey_length,
                                                       filename=fileroot+'%iyrs.db' % years,
