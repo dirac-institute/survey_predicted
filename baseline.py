@@ -710,46 +710,26 @@ def run_sched(surveys, survey_length=365.25, nside=32, fileroot='baseline_', ver
                                                       filter_scheduler=fs)
 
 
-if __name__ == "__main__":
+def create_scheduler(survey_length=365.25*10, maxDither=0.7, moon_illum_limit=40,
+                     nexp=2, rolling_nslice=2, rolling_strength=0.9, gsw=3.0,
+                     ddf_season_frac=0.2, nights_off=6, nights_delayed=-1,
+                     neo_night_pattern=4, neo_filters='riz',
+                     neo_repeat=4):
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", dest='verbose', action='store_true')
-    parser.set_defaults(verbose=False)
-    parser.add_argument("--survey_length", type=float, default=365.25*10)
-    parser.add_argument("--outDir", type=str, default="")
-    parser.add_argument("--maxDither", type=float, default=0.7, help="Dither size for DDFs (deg)")
-    parser.add_argument("--moon_illum_limit", type=float, default=40., help="illumination limit to remove u-band")
-    parser.add_argument("--nexp", type=int, default=2)
-    parser.add_argument("--rolling_nslice", type=int, default=2)
-    parser.add_argument("--rolling_strength", type=float, default=0.9)
-    parser.add_argument("--dbroot", type=str)
-    parser.add_argument("--gsw", type=float, default=3.0, help="good seeing weight")
-    parser.add_argument("--ddf_season_frac", type=float, default=0.2)
-    parser.add_argument("--agg_level", type=str, default="1.5", help="Version of aggregation level map - either 1.5 or 2.0")
-    parser.add_argument("--nights_off", type=int, default=6)
-    parser.add_argument("--nights_delayed", type=int, default=-1)
-    parser.add_argument("--neo_night_pattern", type=int, default=4)
-    parser.add_argument("--neo_filters", type=str, default='riz')
-    parser.add_argument("--neo_repeat", type=int, default=4)
+    survey_length = survey_length  # Days
+    max_dither = maxDither
+    illum_limit = moon_illum_limit
+    nexp = nexp
+    nslice = rolling_nslice
+    rolling_scale = rolling_strength
+    gsw = gsw
+    nights_off = nights_off
+    nights_delayed = nights_delayed
+    neo_night_pattern = neo_night_pattern
+    neo_filters = neo_filters
+    neo_repeat = neo_repeat
 
-    args = parser.parse_args()
-    survey_length = args.survey_length  # Days
-    outDir = args.outDir
-    verbose = args.verbose
-    max_dither = args.maxDither
-    illum_limit = args.moon_illum_limit
-    nexp = args.nexp
-    nslice = args.rolling_nslice
-    rolling_scale = args.rolling_strength
-    dbroot = args.dbroot
-    gsw = args.gsw
-    nights_off = args.nights_off
-    nights_delayed = args.nights_delayed
-    neo_night_pattern = args.neo_night_pattern
-    neo_filters = args.neo_filters
-    neo_repeat = args.neo_repeat
-
-    ddf_season_frac = args.ddf_season_frac
+    ddf_season_frac = ddf_season_frac
 
     nside = 32
     per_night = True  # Dither DDF per night
@@ -773,13 +753,6 @@ if __name__ == "__main__":
         extra_info['rubin_sim git hash'] = subprocess.check_output(['cat', hash_file])
     except subprocess.CalledProcessError:
         pass
-
-    # Use the filename of the script to name the output database
-    if dbroot is None:
-        fileroot = os.path.basename(sys.argv[0]).replace('.py', '') + '_'
-    else:
-        fileroot = dbroot + '_'
-    file_end = 'v2.99_'
 
     pattern_dict = {1: [True], 2: [True, False], 3: [True, False, False],
                     4: [True, False, False, False],
@@ -840,6 +813,8 @@ if __name__ == "__main__":
                                    wfd_footprint=wfd_footprint,
                                    repeat_night_weight=repeat_night_weight, night_pattern=reverse_neo_night_pattern)
     surveys = [ddfs, long_gaps, blobs, twi_blobs, neo, greedy]
-    run_sched(surveys, survey_length=survey_length, verbose=verbose,
-              fileroot=os.path.join(outDir, fileroot+file_end), extra_info=extra_info,
-              nside=nside, illum_limit=illum_limit)
+
+    scheduler = Core_scheduler(surveys, nside=nside)
+    return scheduler
+
+    
