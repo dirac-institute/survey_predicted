@@ -6,6 +6,73 @@ import os
 import argparse
 
 
+def ddf_slopes(ddf_name, raw_obs, night_season):
+    """
+    Let's make custom slopes for each DDF
+
+    Parameters
+    ----------
+    ddf_name : str
+       The DDF name to use
+    raw_obs : np.array
+        An array with values of 1 or zero. One element per night, value of 1 indicates the night 
+        is during an active observing season.
+    night_season : np.array
+        An array of floats with the fractional season value (e.g., 0.5 would be half way through the first season)
+    """
+
+    # OK, so 258 sequences is ~1% of the survey
+    # so a 25.8 sequences is a 0.1% season
+    # COSMOS is going to be 0.7% for 3 years, then 0.175 for the rest.
+
+    ss = 30  # standard season, was 45
+
+    if (ddf_name == 'ELAISS1') | (ddf_name == 'XMM_LSS') | (ddf_name == 'ECDFS'):
+        # Dict with keys for each season and values of the number of sequences
+        # to attempt. 
+        season_vals = {0: 10, 1: ss, 2: ss, 3: ss, 4: ss, 5: ss,
+                       6: ss, 7: ss, 8: ss, 9: ss, 10: 10}
+
+        round_season = np.floor(night_season)
+
+        cumulative_desired = np.zeros(raw_obs.size, dtype=float)
+        for season in np.unique(round_season):
+            in_season = np.where(round_season == season)
+            cumulative = np.cumsum(raw_obs[in_season])
+            cumulative = cumulative/cumulative.max() * season_vals[season]
+            cumulative_desired[in_season] = cumulative + np.max(cumulative_desired)
+
+    if ddf_name == 'EDFS_a':
+        season_vals = {0: 10, 1: ss, 2: ss, 3: ss, 4: ss, 5: ss,
+                       6: ss, 7: ss, 8: ss, 9: ss, 10: 10}
+
+        round_season = np.floor(night_season)
+
+        cumulative_desired = np.zeros(raw_obs.size, dtype=float)
+        for season in np.unique(round_season):
+            in_season = np.where(round_season == season)
+            cumulative = np.cumsum(raw_obs[in_season])
+            cumulative = cumulative/cumulative.max() * season_vals[season]
+            cumulative_desired[in_season] = cumulative + np.max(cumulative_desired)
+
+    if ddf_name == 'COSMOS':
+        # looks like COSMOS has no in-season time for 10 at the current start mjd.
+        season_vals = {0: 10, 1: ss*5, 2: ss*5, 3: ss*2, 4: ss, 5: ss,
+                       6: ss, 7: ss, 8: ss, 9: ss, 10: 10}
+
+        round_season = np.floor(night_season)
+
+        cumulative_desired = np.zeros(raw_obs.size, dtype=float)
+        for season in np.unique(round_season):
+            in_season = np.where(round_season == season)[0]
+            cumulative = np.cumsum(raw_obs[in_season])
+            if cumulative.max() > 0:
+                cumulative = cumulative/cumulative.max() * season_vals[season]
+                cumulative_desired[in_season] = cumulative + np.max(cumulative_desired)
+
+    return cumulative_desired
+
+
 def match_cumulative(cumulative_desired, mask=None, no_duplicate=True):
     """Generate a schedule that tries to match the desired cumulative distribution given a mask
 
@@ -63,7 +130,7 @@ def match_cumulative(cumulative_desired, mask=None, no_duplicate=True):
 def optimize_ddf_times(ddf_name, ddf_RA, ddf_grid,
                        sun_limit=-18, airmass_limit=2.5, sky_limit=None,
                        g_depth_limit=23.5, sequence_limit=258, season_frac=0.1):
-    """Run gyrobi to optimize the times of a ddf
+    """
 
     Parameters
     ----------
@@ -117,8 +184,8 @@ def optimize_ddf_times(ddf_name, ddf_RA, ddf_grid,
 
     out_season = np.where((season_mod < season_frac) | (season_mod > (1.-season_frac)))
     raw_obs[out_season] = 0
-    cumulative_desired = np.cumsum(raw_obs)
-    cumulative_desired = cumulative_desired/cumulative_desired.max()*sequence_limit
+    
+    cumulative_desired = ddf_slopes(ddf_name, raw_obs, night_season)
 
     night_mask = unights*0
     night_mask[potential_nights] = 1
@@ -145,7 +212,7 @@ def generate_ddf_scheduled_obs(data_file='ddf_grid.npz', flush_length=2, mjd_tol
                                alt_min=25, alt_max=85, HA_min=21., HA_max=3.,
                                dist_tol=3., season_frac=0.1,
                                low_season_frac=0.4, low_season_rate=0.3,
-                               nvis_master=[8, 10, 20, 20, 26, 20], filters='ugrizy',
+                               nvis_master=[8, 10, 20, 20, 24, 18], filters='ugrizy',
                                nsnaps=[1, 2, 2, 2, 2, 2], sequence_limit=258):
 
     flush_length = flush_length  # days
@@ -235,22 +302,3 @@ def generate_ddf_scheduled_obs(data_file='ddf_grid.npz', flush_length=2, mjd_tol
     # Put in the scripted ID so it's easier to track which ones fail.
     result['scripted_id'] = np.arange(result.size)
     return result
-
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--out_file", type=str, default='ddf.npz')
-    parser.add_argument("--season_frac", type=float, default=0.1)
-    parser.add_argument("--plot_dir", type=str, default='ddf_plots')
-    args = parser.parse_args()
-    filename = args.out_file
-    season_frac = args.season_frac
-    plot_dir = args.plot_dir
-
-    if (plot_dir is not None) & (plot_dir != 'None'):
-        if not os.path.isdir(plot_dir):
-            os.makedirs(plot_dir)
-
-    obs_array = generate_ddf_scheduled_obs(plot_dir=plot_dir, season_frac=season_frac)
-    np.savez(filename, obs_array=obs_array)
