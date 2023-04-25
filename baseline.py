@@ -734,6 +734,8 @@ def create_scheduler(survey_length=365.25*10, maxDither=0.7, moon_illum_limit=40
     nside = 32
     per_night = True  # Dither DDF per night
 
+    mjd_start = 60218
+
     camera_ddf_rot_limit = 75.
 
     extra_info = {}
@@ -781,7 +783,7 @@ def create_scheduler(survey_length=365.25*10, maxDither=0.7, moon_illum_limit=40
 
     repeat_night_weight = None
 
-    observatory = Model_observatory(nside=nside)
+    observatory = Model_observatory(nside=nside, mjd_start=mjd_start)
     conditions = observatory.return_conditions()
 
     footprints = make_flipped_rolling_footprints(fp_hp=footprints_hp, mjd_start=conditions.mjd_start,
