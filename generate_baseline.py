@@ -3,7 +3,7 @@ from rubin_sim.scheduler.schedulers import simple_filter_sched
 from rubin_sim.scheduler import sim_runner
 from rubin_sim.scheduler.modelObservatory import Model_observatory
 import numpy as np
-mjd_start = 59638
+mjd_start = 60218.0
 
 if __name__ == '__main__':
     nside = 32
