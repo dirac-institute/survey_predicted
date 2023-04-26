@@ -31,7 +31,7 @@ iers.conf.auto_download = False
 # Just redefine the function here. If we want this, go back and add a kwarg to do it properly
 def make_flipped_rolling_footprints(
     fp_hp=None,
-    mjd_start=60218.0,
+    mjd_start=60217,
     sun_RA_start=3.27717639,
     nslice=2,
     scale=0.8,
@@ -734,7 +734,7 @@ def create_scheduler(survey_length=365.25*10, maxDither=0.7, moon_illum_limit=40
     nside = 32
     per_night = True  # Dither DDF per night
 
-    mjd_start = 60218
+    mjd_start = 60217
 
     camera_ddf_rot_limit = 75.
 
