@@ -55,5 +55,5 @@ cd /gscratch/scrubbed/yoachim/survey_predicted
 ## run all the baseline commands in parallel
 module load parallel-20170722
 
-python generate_baseline.py
+python baseline.py --survey_length 365.25
 

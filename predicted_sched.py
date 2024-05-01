@@ -3,18 +3,17 @@
 import numpy as np
 import matplotlib.pylab as plt
 import healpy as hp
-from rubin_sim.scheduler.modelObservatory import Model_observatory
-from rubin_sim.scheduler.schedulers import Core_scheduler, simple_filter_sched
-from rubin_sim.scheduler import sim_runner
-from rubin_sim.scheduler.utils import schema_converter
-from rubin_sim.utils import survey_start_mjd
+from rubin_scheduler.scheduler.model_observatory import ModelObservatory
+from rubin_scheduler.scheduler.schedulers import SimpleFilterSched
+from rubin_scheduler.scheduler import sim_runner
+from rubin_scheduler.scheduler.utils import SchemaConverter
 import argparse
-from baseline import create_scheduler
-from rubin_sim.site_models import Almanac
+from baseline import example_scheduler
+from rubin_scheduler.site_models import Almanac
 # So things don't fail on hyak
 from astropy.utils import iers
 iers.conf.auto_download = False
-mjd_start = 60217.0
+mjd_start = 60796
 
 
 # grabbing this from rubin_sim and making some mods
@@ -35,7 +34,7 @@ def restore_scheduler(mjd_set, night_max, scheduler, observatory,
         The filter scheduler. Note that we don't look up the official end of the previous night,
         so there is potential for the loaded filters to not match.
     """
-    sc = schema_converter()
+    sc = SchemaConverter()
     # load up the observations
     observations = sc.opsim2obs(filename)
     good_obs = np.where(observations["night"] <= night_max)[0]
@@ -72,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument("--verbose", dest='verbose', action='store_true')
     parser.set_defaults(verbose=False)
     parser.add_argument("--night_start", type=float, default=0)
-    parser.add_argument("--truth_file", type=str, default='baseline_1yrs.db')
+    parser.add_argument("--truth_file", type=str, default='baseline_v3.3_1yrs.db')
     parser.add_argument("--survey_length", type=float, default=15.)
    
     nside = 32
@@ -92,11 +91,12 @@ if __name__ == '__main__':
 
     # Let's build the baseline scheduler object.
     # Would probably be faster to do this once and pickle/restore it.
-    scheduler = create_scheduler()
+    scheduler = example_scheduler()
 
     # An observatory model that has no weather downtime
-    observatory = Model_observatory(mjd_start=mjd_start, nside=nside, ideal_conditions=True)
-    filter_sched = simple_filter_sched(illum_limit=illum_limit)
+    observatory = ModelObservatory(mjd_start=mjd_start, nside=nside, downtimes="ideal",
+                                   seeing_data="ideal", cloud_data="ideal")
+    filter_sched = SimpleFilterSched(illum_limit=illum_limit)
 
     # 
     scheduler, observatory = restore_scheduler(mjd_skip_to, night_start, scheduler,
